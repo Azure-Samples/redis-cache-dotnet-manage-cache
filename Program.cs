@@ -85,6 +85,7 @@ namespace ManageRedis
                             .WithRegion(Region.US_CENTRAL)
                             .WithNewResourceGroup(rgName)
                             .WithPremiumSku()
+                            .WithShardCount(3)
                             .Create();
 
                     Console.WriteLine("Created a Redis Cache:");
@@ -94,6 +95,7 @@ namespace ManageRedis
                             .WithRegion(Region.US_CENTRAL)
                             .WithNewResourceGroup(rgName)
                             .WithPremiumSku(2)
+                            .WithShardCount(3)
                             .Create();
 
                     Console.WriteLine("Created a Redis Cache:");
@@ -125,10 +127,10 @@ namespace ManageRedis
 
                         Console.WriteLine("Updated Redis Cache:");
                         Utilities.PrintRedisCache(premium);
-
+                        
                         // Restart Redis Cache
                         Console.WriteLine("Restarting updated Redis Cache");
-                        premium.ForceReboot(RebootType.AllNodes);
+                        premium.ForceReboot(RebootType.AllNodes, 1);
 
                         Console.WriteLine("Redis Cache restart scheduled");
                     }
