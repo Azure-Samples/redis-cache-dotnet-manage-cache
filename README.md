@@ -6,6 +6,18 @@ author: hovsepm
 
 #Getting Started with Redis - Manage Redis - in .Net #
 
+          Azure Redis sample for managing Redis Cache:
+           - Create a Redis Cache and print out hostname.
+           - Get access keys.
+           - Regenerate access keys.
+           - Create another 2 Redis Caches with Premium Sku.
+           - List all Redis Caches in a resource group – for each cache with Premium Sku:
+              - set Redis patch schedule to Monday at 5 am.
+              - update shard count.
+              - enable non-SSL port.
+              - modify max memory policy and reserved settings.
+              - restart it.
+           - Clean up all resources.
 
 
 ## Running this Sample ##
