@@ -3,8 +3,8 @@
 
 using Microsoft.Azure.Management.Fluent;
 using Microsoft.Azure.Management.Redis.Fluent.Models;
-using Microsoft.Azure.Management.Resource.Fluent;
-using Microsoft.Azure.Management.Resource.Fluent.Core;
+using Microsoft.Azure.Management.ResourceManager.Fluent;
+using Microsoft.Azure.Management.ResourceManager.Fluent.Core;
 using Microsoft.Azure.Management.Samples.Common;
 using System;
 using System.Linq;
@@ -54,7 +54,7 @@ namespace ManageRedis
                 // Get | regenerate Redis Cache access keys
 
                 Utilities.Log("Getting Redis Cache access keys");
-                var redisAccessKeys = redisCache1.Keys;
+                var redisAccessKeys = redisCache1.GetKeys();
                 Utilities.PrintRedisAccessKeys(redisAccessKeys);
 
                 Utilities.Log("Regenerating secondary Redis Cache access key");
@@ -94,7 +94,7 @@ namespace ManageRedis
                 var redisCaches = azure.RedisCaches;
 
                 // List Redis Caches and select Premium Sku instances only
-                var caches = redisCaches.ListByGroup(rgName)
+                var caches = redisCaches.ListByResourceGroup(rgName)
                     .Where(rc => rc.IsPremium)
                     .Select(rc => rc.AsPremium());
 
@@ -157,7 +157,7 @@ namespace ManageRedis
 
                 var azure = Azure
                     .Configure()
-                    .WithLogLevel(HttpLoggingDelegatingHandler.Level.BODY)
+                    .WithLogLevel(HttpLoggingDelegatingHandler.Level.BodyAndHeaders)
                     .Authenticate(tokenCredentials).WithSubscription(tokenCredentials.DefaultSubscriptionId);
 
                 // Print selected subscription
