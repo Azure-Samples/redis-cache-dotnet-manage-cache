@@ -4,7 +4,7 @@ platforms: .Net
 author: hovsepm
 ---
 
-#Getting Started with Redis - Manage Redis - in .Net #
+# Getting Started with Redis - Manage Redis - in .Net #
 
           Azure Redis sample for managing Redis Cache:
            - Create a Redis Cache and print out hostname.
