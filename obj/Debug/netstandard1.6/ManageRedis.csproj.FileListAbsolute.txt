@@ -1,2 +1,0 @@
-C:\Sources\dotnet-samples\redis-cache-dotnet-manage-cache\bin\Debug\netstandard1.6\ManageRedis.deps.json
-C:\Sources\dotnet-samples\redis-cache-dotnet-manage-cache\obj\Debug\netstandard1.6\ManageRedis.csproj.CoreCompileInputs.cache

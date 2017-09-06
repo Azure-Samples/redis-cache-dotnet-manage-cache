@@ -1,4 +1,0 @@
-C:\Sources\dotnet-samples\redis-cache-dotnet-manage-cache\bin\Debug\net452\ManageRedis.runtimeconfig.json
-C:\Sources\dotnet-samples\redis-cache-dotnet-manage-cache\bin\Debug\net452\ManageRedis.runtimeconfig.dev.json
-C:\Sources\dotnet-samples\redis-cache-dotnet-manage-cache\obj\Debug\net452\ManageRedis.csproj.ManageRedis.exe.config
-C:\Sources\dotnet-samples\redis-cache-dotnet-manage-cache\obj\Debug\net452\ManageRedis.csproj.CoreCompileInputs.cache
