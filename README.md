@@ -1,4 +1,7 @@
 ---
+page_type: sample
+languages: java
+products: azure
 services: Redis-Cache
 platforms: dotnet
 author: yaohaizh
