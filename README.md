@@ -5,8 +5,8 @@ languages:
 products:
 - azure
 extensions:
-- services: Redis-Cache
-- platforms: dotnet
+  services: Redis-Cache
+  platforms: dotnet
 ---
 
 # Getting started on managing Redis Cache in C# #
