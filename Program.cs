@@ -1,13 +1,14 @@
 ﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License. See License.txt in the project root for license information. 
 
-using Microsoft.Azure.Management.Fluent;
-using Microsoft.Azure.Management.Redis.Fluent.Models;
-using Microsoft.Azure.Management.ResourceManager.Fluent;
-using Microsoft.Azure.Management.ResourceManager.Fluent.Core;
-using Microsoft.Azure.Management.Samples.Common;
-using System;
-using System.Linq;
+using Azure;
+using Azure.Core;
+using Azure.Identity;
+using Azure.ResourceManager;
+using Azure.ResourceManager.Resources;
+using Azure.ResourceManager.Samples.Common;
+using Azure.ResourceManager.Redis;
+using Azure.ResourceManager.Redis.Models;
 
 namespace ManageRedis
 {
@@ -27,147 +28,193 @@ namespace ManageRedis
          *     - restart it.
          *  - Clean up all resources.
          */
-        public static void RunSample(IAzure azure)
+        private static ResourceIdentifier? _resourceGroupId = null;
+        public static async Task RunSample(ArmClient client)
         {
-            var redisCacheName1 = SdkContext.RandomResourceName("rc1", 20);
-            var redisCacheName2 = SdkContext.RandomResourceName("rc2", 20);
-            var redisCacheName3 = SdkContext.RandomResourceName("rc3", 20);
-            var rgName = SdkContext.RandomResourceName("rgRCMC", 20);
-
             try
             {
                 // ============================================================
+       
+                // Get default subscription
+                SubscriptionResource subscription = await client.GetDefaultSubscriptionAsync();
+
+                // Create a resource group in the USCentral region
+                var rgName = Utilities.CreateRandomName("RedisRG");
+                Utilities.Log($"creating resource group with name:{rgName}");
+                var rgLro = await subscription.GetResourceGroups().CreateOrUpdateAsync(WaitUntil.Completed, rgName, new ResourceGroupData(AzureLocation.CentralUS));
+                var resourceGroup = rgLro.Value;
+                _resourceGroupId = resourceGroup.Id;
+                Utilities.Log("Created a resource group with name: " + resourceGroup.Data.Name);
+
                 // Create a Redis cache
-
-                Utilities.Log("Creating a Redis Cache");
-
-                var redisCache1 = azure.RedisCaches.Define(redisCacheName1)
-                        .WithRegion(Region.USCentral)
-                        .WithNewResourceGroup(rgName)
-                        .WithBasicSku()
-                        .Create();
-
-                Utilities.Log("Created a Redis Cache:");
-                Utilities.PrintRedisCache(redisCache1);
-
+                Utilities.Log("Creating the 1st Cache...");
+                var redisCacheName1 = Utilities.CreateRandomName("rc1");
+                var redisCacheCollection = resourceGroup.GetAllRedis();
+                var parameter = new RedisCreateOrUpdateContent(AzureLocation.CentralUS, new RedisSku(RedisSkuName.Basic, RedisSkuFamily.BasicOrStandard, 0));
+                var task1 = redisCacheCollection.CreateOrUpdateAsync(WaitUntil.Completed, redisCacheName1, parameter);
+              
                 // ============================================================
-                // Get | regenerate Redis Cache access keys
 
-                Utilities.Log("Getting Redis Cache access keys");
-                var redisAccessKeys = redisCache1.GetKeys();
-                Utilities.PrintRedisAccessKeys(redisAccessKeys);
-
-                Utilities.Log("Regenerating secondary Redis Cache access key");
-                redisAccessKeys = redisCache1.RegenerateKey(RedisKeyType.Secondary);
-                Utilities.PrintRedisAccessKeys(redisAccessKeys);
-
-                // ============================================================
                 // Create another two Redis Caches
-
-                Utilities.Log("Creating two more Redis Caches with Premium Sku");
-
-                var redisCache2 = azure.RedisCaches.Define(redisCacheName2)
-                        .WithRegion(Region.USCentral)
-                        .WithNewResourceGroup(rgName)
-                        .WithPremiumSku()
-                        .WithShardCount(3)
-                        .Create();
-
-                Utilities.Log("Created a Redis Cache:");
-                Utilities.PrintRedisCache(redisCache2);
-
-                var redisCache3 = azure.RedisCaches.Define(redisCacheName3)
-                        .WithRegion(Region.USCentral)
-                        .WithNewResourceGroup(rgName)
-                        .WithPremiumSku(2)
-                        .WithShardCount(3)
-                        .Create();
-
-                Utilities.Log("Created a Redis Cache:");
-                Utilities.PrintRedisCache(redisCache3);
+              
+                // Create the 2nd Redis Caches
+                Utilities.Log("Creating the 2nd Redis Caches...");
+                var redisCacheName2 = Utilities.CreateRandomName("rc2");
+                var parameter2 = new RedisCreateOrUpdateContent(AzureLocation.CentralUS, new RedisSku(RedisSkuName.Premium, RedisSkuFamily.Premium, 1))
+                {
+                    ShardCount = 3
+                };
+                var task2 = redisCacheCollection.CreateOrUpdateAsync(WaitUntil.Completed, redisCacheName2, parameter2);
+              
+                // Create the 3rd Redis cache
+                Utilities.Log("Creating the 3rd Redis cache...");
+                var redisCacheName3 = Utilities.CreateRandomName("rc3");
+                var parameter3 = new RedisCreateOrUpdateContent(AzureLocation.CentralUS, new RedisSku(RedisSkuName.Premium, RedisSkuFamily.Premium, 2))
+                {
+                    ShardCount = 3
+                };
+                var task3 = redisCacheCollection.CreateOrUpdateAsync(WaitUntil.Completed, redisCacheName3, parameter3);
+                await Task.WhenAll(task1, task2, task3);
+                Utilities.Log($"Created all");
 
                 // ============================================================
+
+                // Get | regenerate Redis Cache access keys
+                Utilities.Log("Getting Redis Cache access keys");
+                var redisAccessKeys = task1.Result.Value.GetKeys();
+                Utilities.Log("Got Redis Cache access keys");
+                Utilities.Log("Regenerating secondary Redis Cache access key");
+                var content = new RedisRegenerateKeyContent(RedisRegenerateKeyType.Secondary);
+                _ = task1.Result.Value.RegenerateKey(content);
+                Utilities.Log("Regenerated secondary Redis Cache access key");
+
+                // ============================================================
+
                 // List Redis Caches inside the resource group
 
-                Utilities.Log("Listing Redis Caches");
-
-                var redisCaches = azure.RedisCaches;
-
-                // List Redis Caches and select Premium Sku instances only
-                var caches = redisCaches.ListByResourceGroup(rgName)
-                    .Where(rc => rc.IsPremium)
-                    .Select(rc => rc.AsPremium());
-
-                foreach (var premium in caches)
+                // Create a Patch Schedules
+                Utilities.Log("Creating a Patch Schedules...");
+                var scheduleCollection2 = task2.Result.Value.GetRedisPatchSchedules();
+                var data2 = new RedisPatchScheduleData(new RedisPatchScheduleSetting[]
                 {
-                    // Update each Premium Sku Redis Cache instance
-                    Utilities.Log("Updating Premium Redis Cache");
-                    premium.Update()
-                            .WithPatchSchedule(Microsoft.Azure.Management.Redis.Fluent.Models.DayOfWeek.Monday, 5)
-                            .WithShardCount(4)
-                            .WithNonSslPort()
-                            .WithRedisConfiguration("maxmemory-policy", "allkeys-random")
-                            .WithRedisConfiguration("maxmemory-reserved", "20")
-                            .Apply();
+                    new RedisPatchScheduleSetting(RedisDayOfWeek.Tuesday, 11)
+                    {
+                        MaintenanceWindow = TimeSpan.FromHours(11)
+                    }
+                });
+                _ = (await scheduleCollection2.CreateOrUpdateAsync(WaitUntil.Completed, RedisPatchScheduleDefaultName.Default, data2)).Value;
+                Utilities.Log("Created a Patch Schedules");
 
-                    Utilities.Log("Updated Redis Cache:");
-                    Utilities.PrintRedisCache(premium);
+                // Create another Patch Schedules
+                Utilities.Log("Creating another Patch Schedules...");
+                var scheduleCollection3 = task3.Result.Value.GetRedisPatchSchedules();
+                var data3 = new RedisPatchScheduleData(new RedisPatchScheduleSetting[]
+                {
+                    new RedisPatchScheduleSetting(RedisDayOfWeek.Tuesday, 11)
+                    {
+                        MaintenanceWindow = TimeSpan.FromHours(11)
+                    }
+                });
+                _ = (await scheduleCollection3.CreateOrUpdateAsync(WaitUntil.Completed, RedisPatchScheduleDefaultName.Default, data3)).Value;
+                Utilities.Log("Created another Patch Schedules");
+                Utilities.Log("Listing Redis Caches");
+                await foreach (var caches in redisCacheCollection.GetAllAsync())
+                {
+                    Utilities.Log("==================");
+                    var premium = caches.Data.Sku.Name.Equals("Premium");
+                    Utilities.Log(caches.Data.Sku.Name);
+                    if (premium)
+                    {
+                        // Restart Redis Cache
+                        Utilities.Log("Restarting updated Redis Cache");
+                        var ForceRebootcontent = new RedisRebootContent()
+                        {
+                            RebootType = RedisRebootType.AllNodes,
+                            ShardId = 1
+                        };
+                        _ = caches.ForceReboot(ForceRebootcontent);
+                        Utilities.Log("Redis Cache restart scheduled");
 
-                    // Restart Redis Cache
-                    Utilities.Log("Restarting updated Redis Cache");
-                    premium.ForceReboot(RebootType.AllNodes, 1);
+                        // Update each Premium Sku Redis Cache instance
+                        Utilities.Log("Updating Premium Redis Cache");
+                        var patch = new RedisPatch()
+                        {
+                            ShardCount = 4,
+                            EnableNonSslPort = true,
+                            RedisConfiguration = new RedisCommonConfiguration()
+                            {
 
-                    Utilities.Log("Redis Cache restart scheduled");
+                                MaxMemoryPolicy = "allkeys-random",
+                                MaxMemoryReserved = "20"
+                            }
+                        };
+                        _ = await caches.UpdateAsync(patch);
+                        Utilities.Log("Updated Premium Redis Cache");
+
+                        // Updating Redis Patch Schedule Setting
+                        Utilities.Log("Updating Redis Patch Schedule Setting");
+                        var scheduleEntries = new RedisPatchScheduleSetting[]
+                        {
+                            new RedisPatchScheduleSetting(RedisDayOfWeek.Monday, 5)
+                            {
+                                MaintenanceWindow = TimeSpan.FromHours(5)
+                            }
+                        };
+                        var scheduleData = new RedisPatchScheduleData(scheduleEntries);
+                        foreach(var schedule in caches.GetRedisPatchSchedules())
+                        {
+                            _ = await schedule.UpdateAsync(WaitUntil.Completed, scheduleData);
+                        }
+                        Utilities.Log("Updated Redis Patch Schedule Setting");
+                        Utilities.Log("Deleting a Redis Cache  - " + task1.Result.Value.Data.Name);
+                        _ =caches.DeleteAsync(WaitUntil.Completed);
+                        Utilities.Log("Deleted Redis Cache");
+                    }
                 }
-
                 // ============================================================
+
                 // Delete a Redis Cache
-
-                Utilities.Log("Deleting a Redis Cache  - " + redisCache1.Name);
-
-                azure.RedisCaches.DeleteById(redisCache1.Id);
-
+                Utilities.Log("Deleting a Redis Cache  - " + task1.Result.Value.Data.Name);
+                _ = task1.Result.Value.DeleteAsync(WaitUntil.Completed);
                 Utilities.Log("Deleted Redis Cache");
             }
             finally
             {
                 try
                 {
-                    Utilities.Log("Deleting Resource Group: " + rgName);
-                    azure.ResourceGroups.DeleteByName(rgName);
-                    Utilities.Log("Deleted Resource Group: " + rgName);
+                    if (_resourceGroupId is not null)
+                    {
+                        Utilities.Log($"Deleting Resource Group: {_resourceGroupId}");
+                        await client.GetResourceGroupResource(_resourceGroupId).DeleteAsync(WaitUntil.Completed);
+                        Utilities.Log($"Deleted Resource Group: {_resourceGroupId}");
+                    }
                 }
                 catch (NullReferenceException)
                 {
                     Utilities.Log("Did not create any resources in Azure. No clean up is necessary");
                 }
-                catch (Exception ex)
+                catch (Exception g)
                 {
-                    Utilities.Log(ex);
+                    Utilities.Log(g);
                 }
             }
         }
 
-        public static void Main(string[] args)
+        public static async Task Main(string[] args)
         {
-
             try
             {
-                var tokenCredentials = SdkContext.AzureCredentialsFactory.FromFile(Environment.GetEnvironmentVariable("AZURE_AUTH_LOCATION"));
-
-                var azure = Azure
-                    .Configure()
-                    .WithLogLevel(HttpLoggingDelegatingHandler.Level.BodyAndHeaders)
-                    .Authenticate(tokenCredentials).WithSubscription(tokenCredentials.DefaultSubscriptionId);
-
-                // Print selected subscription
-                Utilities.Log("Selected subscription: " + azure.SubscriptionId);
-
-                RunSample(azure);
+                var clientId = Environment.GetEnvironmentVariable("CLIENT_ID");
+                var clientSecret = Environment.GetEnvironmentVariable("CLIENT_SECRET");
+                var tenantId = Environment.GetEnvironmentVariable("TENANT_ID");
+                var subscription = Environment.GetEnvironmentVariable("SUBSCRIPTION_ID");
+                ClientSecretCredential credential = new ClientSecretCredential(tenantId, clientId, clientSecret);
+                ArmClient client = new ArmClient(credential, subscription);
+                await RunSample(client);
             }
-            catch (Exception ex)
+            catch (Exception e)
             {
-                Utilities.Log(ex);
+                Utilities.Log(e);
             }
         }
     }
